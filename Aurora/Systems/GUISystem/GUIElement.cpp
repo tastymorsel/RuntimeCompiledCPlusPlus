@@ -37,7 +37,7 @@ public:
 		{
 			m_Event.GetParameters()->GetInto( parameter, strvalue );
 		}
-		strcpy_s( buffer, buffer_size, strvalue.CString() );
+		strncpy( buffer, strvalue.CString(), buffer_size );
 	}
 private:
 	Rocket::Core::Event& m_Event;
@@ -156,7 +156,7 @@ void GUIElement::GetAttribute(const char* attribute, char* buffer, size_t buffer
 		{
 			Rocket::Core::String strvalue;
 			pVar->GetInto( strvalue );
-			strcpy_s( buffer, buffer_size, strvalue.CString() );
+			strncpy( buffer, strvalue.CString(), buffer_size );
 		}
 	}
 }

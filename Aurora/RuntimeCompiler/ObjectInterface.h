@@ -83,8 +83,13 @@ struct IPerModuleInterface
 
 };
 
-
+#ifdef PLATFORM_MAC
+typedef IPerModuleInterface* (*GETPerModuleInterface_PROC)(void);
+typedef void*		MODULE_TYPE;
+#else
 typedef IPerModuleInterface* (__cdecl *GETPerModuleInterface_PROC)(void);
+typedef HMODULE		MODULE_TYPE;
+#endif
 
 
 #endif //OBJECTINTERFACE_INCLUDED

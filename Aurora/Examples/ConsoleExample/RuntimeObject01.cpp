@@ -43,3 +43,4 @@ public:
 
 
 REGISTERCLASS(RuntimeObject01);
+

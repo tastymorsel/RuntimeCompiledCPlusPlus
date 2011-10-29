@@ -31,7 +31,7 @@ void EntitySystem::Entity::SetName(const char * sName)
 {
 	if (sName && sName[0])
 	{
-		strncpy_s(m_sName, sName, AU_ENTITY_NAME_LENGTH);
+		strncpy(m_sName, sName, AU_ENTITY_NAME_LENGTH);
 		m_sName[AU_ENTITY_NAME_LENGTH-1] = '\0';
 		// Could re length warn here
 	}

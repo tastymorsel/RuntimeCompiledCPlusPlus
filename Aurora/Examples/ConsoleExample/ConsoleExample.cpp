@@ -20,7 +20,7 @@
 
 #include "ConsoleGame.h"
 #include <iostream>
-#include <conio.h>
+#include <stdio.h>
 
 
 int main(int argc, char* argv[])
@@ -35,7 +35,7 @@ int main(int argc, char* argv[])
 	else
 	{
 		std::cout << "\nFailed Initialisation, press a key to exit.\n";
-		int ret = _getche();
+		int ret = getchar();
 	}
 
 	return 0;

@@ -19,10 +19,23 @@
 
 #include <vector>
 #include "../libRocket/Include/Rocket/Core.h"
-#include <Windows.h>
-#include <concrt.h>
 #include <stdarg.h>
 #include <assert.h>
+
+#ifdef PLATFORM_WINDOWS
+#include <Windows.h>
+#include <concrt.h>
+#else
+struct CRITICAL_SECTION
+{
+};
+
+void InitializeCriticalSection(CRITICAL_SECTION *cs) {}
+void DeleteCriticalSection(CRITICAL_SECTION *cs) {}
+void EnterCriticalSection(CRITICAL_SECTION *cs) {}
+void LeaveCriticalSection(CRITICAL_SECTION *cs) {}
+
+#endif
 
 
 
@@ -54,6 +67,8 @@ RocketLogSystem::~RocketLogSystem(void)
 
 void RocketLogSystem::Push(void)
 {
+	int msgStart=0;
+	int msgEnd=0;
 	EnterCriticalSection(&(m_pImpl->critSec));
 
 	int count = m_pImpl->messageTypes.size();
@@ -65,8 +80,6 @@ void RocketLogSystem::Push(void)
 	if (!pRocketSystemInterface)
 		goto Cleanup;
 		
-	int msgStart=0;
-	int msgEnd=0;
 	for (int i=0; i<count; ++i)
 	{
 		// Find the first logging substring

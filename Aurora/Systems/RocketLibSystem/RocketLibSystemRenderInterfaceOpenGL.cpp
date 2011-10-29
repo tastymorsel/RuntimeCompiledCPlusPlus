@@ -51,7 +51,7 @@ void RocketLibSystemRenderInterfaceOpenGL::RenderGeometry(Rocket::Core::Vertex* 
 	else
 	{
 		glEnable(GL_TEXTURE_2D);
-		glBindTexture(GL_TEXTURE_2D, (GLuint) texture);
+		glBindTexture(GL_TEXTURE_2D, (intptr_t) texture);
 		glEnableClientState(GL_TEXTURE_COORD_ARRAY);
 		glTexCoordPointer(2, GL_FLOAT, sizeof(Rocket::Core::Vertex), &vertices[0].tex_coord);
 	}

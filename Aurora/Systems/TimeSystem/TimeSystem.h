@@ -49,7 +49,11 @@ public:
 	double GetSmoothFrameDuration() const;
 
 private:
+#ifdef PLATFORM_WINDOWS
 	typedef __int64 INT64;
+#else
+	typedef unsigned long long INT64;
+#endif
 
 	void Reset();
 	double GetRawTime() const;

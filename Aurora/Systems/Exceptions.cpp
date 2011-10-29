@@ -17,9 +17,11 @@
 
 #include "Exceptions.h"
 
+#ifdef PLATFORM_WINDOWS
 #include "Windows.h"
 #include "WinBase.h"
 #include "excpt.h"
+#endif
 
 
 // All of this could move into a DebugSystem API
@@ -36,6 +38,7 @@ static ExceptionState s_exceptionState = ES_PASS;
 int RuntimeExceptionFilter()
 {
 	int result;
+#if PLATFORM_WINDOWS
 	switch (s_exceptionState)
 	{
 	case ES_PASS:
@@ -53,12 +56,14 @@ int RuntimeExceptionFilter()
 		break;
 	}
 
+#endif
 	return result;
 }
 
 
 int SimpleExceptionFilter( void * nativeExceptionInfo, AuroraExceptionInfo *auroraExceptionInfo )
-{	
+{
+#if PLATFORM_WINDOWS
 	EXCEPTION_RECORD *pRecord = ((LPEXCEPTION_POINTERS) nativeExceptionInfo)->ExceptionRecord;
 	int nCode = pRecord->ExceptionCode;
 	auroraExceptionInfo->exceptionType = ESE_Unknown;
@@ -88,6 +93,7 @@ int SimpleExceptionFilter( void * nativeExceptionInfo, AuroraExceptionInfo *auro
 		// We recognised it and so should catch it
 		return EXCEPTION_EXECUTE_HANDLER;
 	}
+#endif
 
 	// Otherwise fall back
 	return RuntimeExceptionFilter();

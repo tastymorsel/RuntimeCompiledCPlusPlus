@@ -28,11 +28,12 @@
 #include "RocketLibSystem.h"
 #include <Rocket/Core.h>
 #include "RocketLibSystemFileInterface.h"
-#include "macosx/InputMacOSX.h"
+#include "InputMacOSX.h"
 #include <Carbon/Carbon.h>
 #include <AGL/agl.h>
 #include <sys/time.h>
 #include <stdio.h>
+#include <MacWindows.h>
 
 static const EventTypeSpec INPUT_EVENTS[] = {
 	{ kEventClassKeyboard, kEventRawKeyDown },
@@ -260,7 +261,7 @@ void RocketLibSystem::DisplayError(const char* fmt, ...)
 	buffer[len + 1] = '\0';
 	va_end(argument_list);
 
-	fprintf(stderr, buffer);
+	fprintf(stderr, "%s", buffer);
 }
 
 void RocketLibSystem::Log(const char* fmt, ...)
@@ -280,7 +281,7 @@ void RocketLibSystem::Log(const char* fmt, ...)
 	buffer[len + 1] = '\0';
 	va_end(argument_list);
 
-	printf(buffer);
+	printf("%s", buffer);
 }
 
 float RocketLibSystem::GetElapsedTime() 

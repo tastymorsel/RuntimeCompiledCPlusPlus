@@ -20,6 +20,10 @@
 
 #ifdef _WINDOWS_
 #include "FileMonitor_PlatformWindows.h"
+#elif defined(PLATFORM_MAC)
+#include "FileMonitor_PlatformMac.h"
+#include <algorithm>
+#define max std::max
 #endif
 
 #define DEFAULT_MIN_TIME_BETWEEN_RECOMPILES 1.0f
@@ -160,7 +164,7 @@ void FileChangeNotifier::TriggerNotificationIfPossible()
 
 void FileChangeNotifier::NotifyListeners()
 {
-	std::map<IFileChangeListener*, AUDynArray<const char*>> interestedListenersMap;
+	std::map<IFileChangeListener*, AUDynArray<const char*> > interestedListenersMap;
 
 	// Determine which listeners are interested in which changed files
 	TPathNameList::const_iterator fileIt = m_changedFileList.begin();
@@ -180,8 +184,8 @@ void FileChangeNotifier::NotifyListeners()
 	}
 
 	// Notify each listener with an appropriate file list
-	std::map<IFileChangeListener*, AUDynArray<const char*>>::iterator finalIt = interestedListenersMap.begin();
-	std::map<IFileChangeListener*, AUDynArray<const char*>>::iterator finalItEnd = interestedListenersMap.end();
+	std::map<IFileChangeListener*, AUDynArray<const char*> >::iterator finalIt = interestedListenersMap.begin();
+	std::map<IFileChangeListener*, AUDynArray<const char*> >::iterator finalItEnd = interestedListenersMap.end();
 	while (finalIt != finalItEnd)
 	{
 		finalIt->first->OnFileChange(finalIt->second);	

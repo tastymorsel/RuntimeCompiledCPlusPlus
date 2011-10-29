@@ -26,6 +26,12 @@
 #include "../../Examples/SimpleTest/Environment.h"	//TODO: Move exception handling to systems
 #include "../../Examples/SimpleTest/IObject.h"		//TODO: Move to systems
 
+#ifdef PLATFORM_WINDOWS
+#define SEH_ENABLED
+#else
+#undef SEH_ENABLED
+#endif
+
 IObjectConstructor* ObjectFactorySystem::GetConstructor( const char* type ) const
 {
 	CONSTRUCTORMAP::const_iterator found =  m_ConstructorIds.find( type );
@@ -57,40 +63,52 @@ IObjectConstructor* ObjectFactorySystem::GetConstructor( ConstructorId id ) cons
 
 bool ProtectedConstruct( IObjectConstructor* pConstructor )
 {
+#ifdef SEH_ENABLED
 	__try
 	{
+#endif
 		pConstructor->Construct();
+#ifdef SEH_ENABLED
 	}
 	__except( RuntimeExceptionFilter() )
 	{
 		return false;
 	}
+#endif
 	return true;
 }
 
 bool ProtectedSerialize( IObject* pObject, SimpleSerializer& serializer )
 {
+#ifdef SEH_ENABLED
 	__try
 	{
+#endif
 		serializer.Serialize( pObject );
+#ifdef SEH_ENABLED
 	}
 	__except( RuntimeExceptionFilter() )
 	{
 		return false;
 	}
+#endif
 	return true;
 }
 
 bool ProtectedInit( IObject* pObject )
 {
+#ifdef SEH_ENABLED
 	__try
 	{
+#endif
 		pObject->Init(false);
+#ifdef SEH_ENABLED
 	}
 	__except( RuntimeExceptionFilter() )
 	{
 		return false;
 	}
+#endif
 	return true;
 }
 

@@ -23,7 +23,9 @@
 #include "ObjectInterface.h"
 #include "IFileChangeNotifier.h"
 #include "IFileMonitor.h"
+#ifdef PLATFORM_WINDOWS
 #include <windows.h>
+#endif
 #include <vector>
 #include <map>
 #include <set>

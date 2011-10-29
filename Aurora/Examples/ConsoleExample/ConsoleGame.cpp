@@ -42,9 +42,15 @@
 #include "../../Systems/IUpdateable.h"
 
 #include <iostream>
+#ifdef PLATFORM_WINDOWS
 #include <tchar.h>
 #include <conio.h>
-#include <strstream>
+#elif PLATFORM_MAC
+#include <sys/param.h>
+#include <mach-o/dyld.h>
+#include <dlfcn.h>
+#endif
+#include <sstream>
 #include <vector>
 #include <algorithm>
 #include <string>
@@ -109,6 +115,7 @@ ConsoleGame::~ConsoleGame()
 bool ConsoleGame::Init()
 {
 	// We need the current directory to be the process dir
+#ifdef PLATFORM_WINDOWS
 	DWORD size = MAX_PATH;
 	wchar_t filename[MAX_PATH];
 	GetModuleFileName( NULL, filename, size );
@@ -116,16 +123,29 @@ bool ConsoleGame::Init()
 	path launchPath( strTempFileName );
 	launchPath = launchPath.parent_path();
 	SetCurrentDirectory( launchPath.wstring().c_str() );
+#else
+	char filename[MAXPATHLEN];
+	unsigned int size = MAXPATHLEN;
+	int rv = _NSGetExecutablePath(filename, &size);
+	path launchPath( filename );
+	launchPath = launchPath.parent_path();
+	chdir(launchPath.string().c_str());
+#endif
 
 	m_pCompilerLogger = new CompilerLogger();
 	m_pBuildTool = new BuildTool();
 	m_pBuildTool->Initialise(m_pCompilerLogger);
 
 	// We start by using the code in the current module
-	HMODULE module = GetModuleHandle(NULL);
-
 	GETPerModuleInterface_PROC pPerModuleInterfaceProcAdd = NULL;
+
+#ifdef PLATFORM_WINDOWS
+	MODULE_TYPE module = GetModuleHandle(NULL);
 	pPerModuleInterfaceProcAdd = (GETPerModuleInterface_PROC) GetProcAddress(module, "GetPerModuleInterface");
+#else
+	pPerModuleInterfaceProcAdd = (GETPerModuleInterface_PROC) dlsym(RTLD_MAIN_ONLY, "GetPerModuleInterface");
+#endif
+
 	if (!pPerModuleInterfaceProcAdd)
 	{
 		std::cout << "Failed GetProcAddress for GetPerModuleInterface in current module\n";
@@ -273,7 +293,7 @@ bool ConsoleGame::MainLoop()
 	}
 
 	std::cout << "\nMain Loop - press q to quit, enter to run object loop and check for changed files\n";
-	int ret = _getche();
+	int ret = getchar();
 	if( 'q' == ret )
 	{
 		return false;
@@ -289,6 +309,7 @@ void ConsoleGame::StartRecompile(const TFileList& filelist, bool bForce)
 	gSys->pLogSystem->Log(eLV_COMMENTS, "Compiling...\n");
 
 	//Use a temporary filename for the dll
+#if PLATFORM_WINDOWS
 	wchar_t tempPath[MAX_PATH];
 	GetTempPath( MAX_PATH, tempPath );
 	wchar_t tempFileName[MAX_PATH]; 
@@ -300,6 +321,17 @@ void ConsoleGame::StartRecompile(const TFileList& filelist, bool bForce)
 	GetModuleFileNameW( NULL, CurrentModuleFileName, MAX_PATH ); //get filename of current module (full path?)
 	path currModuleFileName(CurrentModuleFileName);
 	path currModuleFullPath = currModuleFileName.parent_path();
+#else
+	char tempFileName[L_tmpnam];
+	tmpnam(tempFileName);
+	std::string strTempFileName( tempFileName );
+
+	char filename[MAXPATHLEN];
+	unsigned int size = MAXPATHLEN;
+	int rv = _NSGetExecutablePath(filename, &size);
+	path currModuleFileName(filename);
+	path currModuleFullPath = currModuleFileName.parent_path();
+#endif
 
 
 	std::vector<path> buildFileList;
@@ -329,10 +361,14 @@ bool ConsoleGame::LoadCompiledModule()
 	boost::system::error_code ec;
 	uintmax_t sizeOfModule = file_size( m_CurrentlyCompilingModuleName, ec );
 
-	HMODULE module = 0;
+	MODULE_TYPE module = 0;
 	if( sizeOfModule )
 	{
+#if PLATFORM_WINDOWS
 		module = LoadLibraryW( m_CurrentlyCompilingModuleName.c_str() );
+#else
+		module = dlopen( m_CurrentlyCompilingModuleName.c_str(), RTLD_NOW );
+#endif
 	}
 
 	if (!module)
@@ -341,7 +377,11 @@ bool ConsoleGame::LoadCompiledModule()
 		return false;
 	}
 
+#if PLATFORM_WINDOWS
 	GETPerModuleInterface_PROC pPerModuleInterfaceProcAdd = (GETPerModuleInterface_PROC) GetProcAddress(module, "GetPerModuleInterface");
+#else
+	GETPerModuleInterface_PROC pPerModuleInterfaceProcAdd = (GETPerModuleInterface_PROC) dlsym(module, "GetPerModuleInterface");
+#endif
 	if (!pPerModuleInterfaceProcAdd)
 	{
 		gSys->pLogSystem->Log(eLV_ERRORS,"Failed GetProcAddress\n");

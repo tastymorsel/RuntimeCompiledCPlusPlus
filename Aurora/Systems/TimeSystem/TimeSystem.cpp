@@ -17,7 +17,13 @@
 
 #include "TimeSystem.h"
 
+#ifdef PLATFORM_WINDOWS
 #include "Windows.h"      // For QueryPerformanceCounter
+#else
+#define QueryPerformanceCounter(d) 
+#define QueryPerformanceFrequency(d) 
+typedef int LARGE_INTEGER;
+#endif
 #include "assert.h"
 
 /*

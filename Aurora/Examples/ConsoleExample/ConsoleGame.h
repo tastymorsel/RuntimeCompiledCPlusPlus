@@ -24,7 +24,9 @@
 #include "../../RuntimeCompiler/ObjectInterface.h"
 #include "../../Common/AUArray.inl"
 #include "../../Systems/IObjectFactorySystem.h"
+#ifdef PLATFORM_WINDOWS
 #include <Windows.h>
+#endif
 #include <vector>
 
 #define BOOST_FILESYSTEM_VERSION 3
@@ -84,7 +86,7 @@ private:
 	IAUUpdateable* m_pUpdateable;
 	ObjectId	   m_ObjectId;
 
-	std::vector<HMODULE> m_Modules;	// Stores runtime created modules, but not the exe module.
+	std::vector<MODULE_TYPE> m_Modules;	// Stores runtime created modules, but not the exe module.
 	TFileList m_RuntimeFileList;
 	bool m_bHaveProgramError;
 	bool m_bCompiling;
