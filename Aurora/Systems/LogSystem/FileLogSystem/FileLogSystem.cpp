@@ -80,13 +80,18 @@ void FileLogSystem::LogInternal(ELogVerbosity eVerbosity, const char * format, v
 	
 	if (!m_fp) OpenFile();
 	if (!m_fp) return;
+	
+	va_list va;
+	va_copy(va, args);
 
-	int result = vsnprintf(m_buff, LOGSYSTEM_MAX_BUFFER, format, args);
+	int result = vsnprintf(m_buff, LOGSYSTEM_MAX_BUFFER, format, va);
 	assert(result != -1);
 	// Make sure there's a limit to the amount of rubbish we can output
 	m_buff[LOGSYSTEM_MAX_BUFFER-1] = '\0';
 	fprintf(m_fp, "%s", m_buff);
 	fflush(m_fp);
+
+	va_end(va);
 }
 
 bool FileLogSystem::OpenFile()

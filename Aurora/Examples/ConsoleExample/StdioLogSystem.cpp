@@ -67,11 +67,15 @@ void StdioLogSystem::LogInternal(ELogVerbosity eVerbosity, const char * format, 
 {
 	if (eVerbosity > m_eVerbosity || eVerbosity == eLV_NEVER) return;
 
-	int result = vsnprintf(m_buff, LOGSYSTEM_MAX_BUFFER, format, args);
+	va_list va;
+	va_copy(va, args);
+
+	int result = vsnprintf(m_buff, LOGSYSTEM_MAX_BUFFER, format, va);
 	assert(result != -1);
 	// Make sure there's a limit to the amount of rubbish we can output
 	m_buff[LOGSYSTEM_MAX_BUFFER-1] = '\0';
 
 	std::cout << m_buff;
 
+	va_end(va);
 }
