@@ -292,11 +292,15 @@ bool ConsoleGame::MainLoop()
 
 	}
 
-	std::cout << "\nMain Loop - press q to quit, enter to run object loop and check for changed files\n";
+	std::cout << "\nMain Loop - press q to quit, r to force re-compile, enter to run object loop and check for changed files\n";
 	int ret = getchar();
 	if( 'q' == ret )
 	{
 		return false;
+	}
+	else if ( 'r' == ret )
+	{
+		StartRecompile(m_RuntimeFileList, true);
 	}
 	m_pUpdateable->Update( deltaTime );
 
@@ -330,7 +334,7 @@ void ConsoleGame::StartRecompile(const TFileList& filelist, bool bForce)
 	unsigned int size = MAXPATHLEN;
 	int rv = _NSGetExecutablePath(filename, &size);
 	path currModuleFileName(filename);
-	path currModuleFullPath = currModuleFileName.parent_path();
+	path currModuleFullPath = currModuleFileName.parent_path().normalize();
 #endif
 
 
@@ -343,7 +347,11 @@ void ConsoleGame::StartRecompile(const TFileList& filelist, bool bForce)
 		buildFileList.push_back( filelist[i] );
 	}
 	buildFileList.push_back( currModuleFullPath / path(L"/../RunTimeCompiler/ObjectInterfacePerModuleSource.cpp") );
+#ifdef PLATFORM_WINDOWS
 	buildFileList.push_back( currModuleFullPath / path(L"/../RunTimeCompiler/ObjectInterfacePerModuleSource_PlatformWindows.cpp") );
+#else
+	//buildFileList.push_back( currModuleFullPath / path(L"/../RunTimeCompiler/ObjectInterfacePerModuleSource_PlatformMac.cpp") );
+#endif
 
 	includeDirList.push_back( currModuleFullPath / path(L"/../RunTimeCompiler/") );
 	includeDirList.push_back( currModuleFullPath / path(L"/../Systems/") );
@@ -367,13 +375,17 @@ bool ConsoleGame::LoadCompiledModule()
 #if PLATFORM_WINDOWS
 		module = LoadLibraryW( m_CurrentlyCompilingModuleName.c_str() );
 #else
-		module = dlopen( m_CurrentlyCompilingModuleName.c_str(), RTLD_NOW );
+		module = dlopen( m_CurrentlyCompilingModuleName.c_str(), RTLD_LAZY|RTLD_FIRST );
 #endif
 	}
 
 	if (!module)
 	{
+#if PLATFORM_WINDOWS
 		gSys->pLogSystem->Log(eLV_ERRORS,"Failed to load module %ls\n",m_CurrentlyCompilingModuleName.c_str());
+#else
+		gSys->pLogSystem->Log(eLV_ERRORS,"Failed to load module %s\n",m_CurrentlyCompilingModuleName.c_str());
+#endif
 		return false;
 	}
 

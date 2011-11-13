@@ -1,7 +1,7 @@
 #!/bin/bash
 
 ROOT=../..
-BUILDDIR=Build
+BUILDDIR=$(ROOT)/Build
 
 SOURCES=ConsoleExample.o ConsoleGame.o RuntimeObject01.o StdioLogSystem.o
 OBJECTS := $(foreach file, ${SOURCES}, $(BUILDDIR)/${file})
@@ -11,7 +11,7 @@ INCLUDE=-I $(ROOT)/External/boost -I $(ROOT)/External/libRocket/Include -I /Syst
 
 LIBS=/Users/pjh/Downloads/boost_1_47_0/bin.v2/libs/filesystem/build/darwin-4.2.1/debug/libboost_filesystem.dylib /Users/pjh/Downloads/boost_1_47_0/bin.v2/libs/filesystem/build/darwin-4.2.1/debug/libboost_filesystem.dylib /Users/pjh/Downloads/boost_1_47_0/bin.v2/libs/system/build/darwin-4.2.1/debug/libboost_system.dylib $(BUILDDIR)/RuntimeCompiler.a $(BUILDDIR)/Systems.a
 
-TARGET=ConsoleGame
+TARGET=$(BUILDDIR)/ConsoleGame
 
 $(TARGET): $(OBJECTS) $(BUILDDIR)/RuntimeCompiler.a $(BUILDDIR)/Systems.a
 	@echo -- Linking ${TARGET}...

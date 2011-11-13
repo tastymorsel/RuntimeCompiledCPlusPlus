@@ -36,174 +36,46 @@
 
 #include "ICompilerLogger.h"
 
+#include <sys/param.h>
+#include <mach-o/dyld.h>
+
+using boost::filesystem::path;
+
 using namespace std;
-
-
-struct VSVersionInfo
-{
-	int				Version;
-	std::wstring	Path;
-};
 
 const std::string	c_CompletionToken( "_COMPLETION_TOKEN_" );
 
 void ReadAndHandleOutputThread( void *arg );
-void WriteInput( int hPipeWrite, std::string& input  );
+void WriteInput( FILE *writeHere, std::string& input  );
 
-#if 0
 class PlatformCompilerImplData
 {
 public:
 	PlatformCompilerImplData()
-		: m_bCompileIsComplete( false )
-		, m_CmdProcessOutputRead( NULL )
-		, m_CmdProcessInputWrite( NULL )
+		: m_bCompileIsComplete( false ),
+		m_pFileHandle(0)
 	{
-		ZeroMemory( &m_CmdProcessInfo, sizeof(m_CmdProcessInfo) );
 	}
 
 	void InitialiseProcess()
 	{
-		//init compile process
-		STARTUPINFOW				si;
-		ZeroMemory( &si, sizeof(si) );
-		si.cb = sizeof(si);
+		char filename[MAXPATHLEN];
+		unsigned int size = MAXPATHLEN;
+		int rv = _NSGetExecutablePath(filename, &size);
+		path cdPath( filename );
+		cdPath = cdPath.parent_path() / "../Examples/ConsoleExample";
 
-		boost::filesystem::path VSPath(  m_VSPath );
-		std::string cmdSetParams = "@PROMPT $ \n\"" + VSPath.string() + "Vcvars32.bat\"\n";
+		m_pFileHandle = popen("/bin/bash", "r+");
+		std::string str = "cd " + cdPath.string() + "\n";
 
-		// Set up the security attributes struct.
-		SECURITY_ATTRIBUTES sa;
-		sa.nLength= sizeof(SECURITY_ATTRIBUTES);
-		sa.lpSecurityDescriptor = NULL;
-		sa.bInheritHandle = TRUE;
-
-
-		// Create the child output pipe.
-		//redirection of output
-		si.dwFlags = STARTF_USESTDHANDLES | STARTF_USESHOWWINDOW;
-		si.wShowWindow = SW_HIDE;
-		HANDLE hOutputReadTmp,hOutputWrite;
-		if (!CreatePipe(&hOutputReadTmp,&hOutputWrite,&sa,20*1024))
-		{
-			m_pLogger->LogError("[RuntimeCompiler] Failed to create output redirection pipe\n");
-			goto ERROR_EXIT;
-		}
-		si.hStdOutput = hOutputWrite;
-
-		// Create a duplicate of the output write handle for the std error
-		// write handle. This is necessary in case the child application
-		// closes one of its std output handles.
-		HANDLE hErrorWrite;
-		if (!DuplicateHandle(GetCurrentProcess(),hOutputWrite,
-							   GetCurrentProcess(),&hErrorWrite,0,
-							   TRUE,DUPLICATE_SAME_ACCESS))
-		{
-			m_pLogger->LogError("[RuntimeCompiler] Failed to duplicate error output redirection pipe\n");
-			goto ERROR_EXIT;
-		}
-		si.hStdError = hErrorWrite;
-
-
-		// Create new output read handle and the input write handles. Set
-		// the Properties to FALSE. Otherwise, the child inherits the
-		// properties and, as a result, non-closeable handles to the pipes
-		// are created.
- 		HANDLE hOutputRead;
- 		if( si.hStdOutput )
-		{
-			 if (!DuplicateHandle(GetCurrentProcess(),hOutputReadTmp,
-								   GetCurrentProcess(),
-								   &hOutputRead, // Address of new handle.
-								   0,FALSE, // Make it uninheritable.
-								   DUPLICATE_SAME_ACCESS))
-			 {
-				   m_pLogger->LogError("[RuntimeCompiler] Failed to duplicate output read pipe\n");
-				   goto ERROR_EXIT;
-			 }
-		}
-
-
-		HANDLE hInputRead,hInputWriteTmp,hInputWrite;
-		// Create a pipe for the child process's STDIN. 
-		if (!CreatePipe(&hInputRead, &hInputWriteTmp, &sa, 4096))
-		{
-			m_pLogger->LogError("[RuntimeCompiler] Failed to create input pipes\n");
-			goto ERROR_EXIT;
-		}
-		si.hStdInput = hInputRead;
-
-		// Create new output read handle and the input write handles. Set
-		// the Properties to FALSE. Otherwise, the child inherits the
-		// properties and, as a result, non-closeable handles to the pipes
-		// are created.
- 		if( si.hStdOutput )
-		{
-			 if (!DuplicateHandle(GetCurrentProcess(),hInputWriteTmp,
-								   GetCurrentProcess(),
-								   &hInputWrite, // Address of new handle.
-								   0,FALSE, // Make it uninheritable.
-								   DUPLICATE_SAME_ACCESS))
-			 {
-				   m_pLogger->LogError("[RuntimeCompiler] Failed to duplicate input write pipe\n");
-				   goto ERROR_EXIT;
-			 }
-		}
-		/*
-		// Ensure the write handle to the pipe for STDIN is not inherited. 
-		if ( !SetHandleInformation(hInputWrite, HANDLE_FLAG_INHERIT, 0) )
-		{
-			m_pLogger->LogError("[RuntimeCompiler] Failed to make input write pipe non inheritable\n");
-			goto ERROR_EXIT;
-		}
-		*/
-
-		wchar_t* pCommandLine = L"cmd /q";
-		//CreateProcessW won't accept a const pointer, so copy to an array 
-		wchar_t pCmdLineNonConst[1024];
-		wcscpy_s( pCmdLineNonConst, pCommandLine );
-		CreateProcessW(
-			  NULL,				//__in_opt     LPCTSTR lpApplicationName,
-			  pCmdLineNonConst,			//__inout_opt  LPTSTR lpCommandLine,
-			  NULL,				//__in_opt     LPSECURITY_ATTRIBUTES lpProcessAttributes,
-			  NULL,				//__in_opt     LPSECURITY_ATTRIBUTES lpThreadAttributes,
-			  TRUE,				//__in         BOOL bInheritHandles,
-			  0,				//__in         DWORD dwCreationFlags,
-			  NULL,				//__in_opt     LPVOID lpEnvironment,
-			  NULL,				//__in_opt     LPCTSTR lpCurrentDirectory,
-			  &si,				//__in         LPSTARTUPINFO lpStartupInfo,
-			  &m_CmdProcessInfo				//__out        LPPROCESS_INFORMATION lpProcessInformation
-			);
-
-
-
-		m_CmdProcessInputWrite = hInputWrite;
-		m_CmdProcessOutputRead = hOutputRead;
-
-		//send initial set up command
-		WriteInput( m_CmdProcessInputWrite, cmdSetParams );
-
-		//launch threaded read.
-		_beginthread( ReadAndHandleOutputThread, 0, this ); //this will exit when process for compile is closed
-
-
-	ERROR_EXIT:
-		CloseHandle( hOutputReadTmp );
-		hOutputReadTmp = NULL;
-		CloseHandle( hOutputWrite );
-		hOutputWrite = NULL;
-		CloseHandle( hErrorWrite );
-		hErrorWrite = NULL;
+		fwrite(str.c_str(), str.size(), 1, m_pFileHandle);
+		fflush(m_pFileHandle);
 	}
-	std::wstring		m_VSPath;
-	std::string			m_intermediatePath;
-	//PROCESS_INFORMATION m_CmdProcessInfo;
-	//HANDLE				m_CmdProcessOutputRead;
-	//HANDLE				m_CmdProcessInputWrite;
+
+	FILE				*m_pFileHandle;
 	volatile bool		m_bCompileIsComplete;
 	ICompilerLogger*	m_pLogger;
 };
-#endif
 
 Compiler::Compiler() 
 	: m_pImplData( 0 )
@@ -212,107 +84,69 @@ Compiler::Compiler()
 
 Compiler::~Compiler()
 {
-#if 0
-	BOOL retval = TerminateProcess( m_pImplData->m_CmdProcessInfo.hProcess, 0 );
-	//CloseHandle( m_pImplData->m_CmdProcessInfo.hProcess );
-    CloseHandle( m_pImplData->m_CmdProcessInfo.hThread );
-	CloseHandle( m_pImplData->m_CmdProcessInputWrite );
-	CloseHandle( m_pImplData->m_CmdProcessOutputRead );
-#endif
+	pclose(m_pImplData->m_pFileHandle);
 }
 
 const std::wstring Compiler::GetObjectFileExtension() const
 {
-	return L".obj";
+	return L".o";
 }
 
 bool Compiler::GetIsComplete() const
 {
-	return false;//m_pImplData->m_bCompileIsComplete;
+	return m_pImplData->m_bCompileIsComplete;
 }
 
 void Compiler::Initialise( ICompilerLogger * pLogger )
 {
-#if 0
 	assert( pLogger );
 
 	m_pImplData = new PlatformCompilerImplData;
 	m_pImplData->m_pLogger = pLogger;
-
-	// Remove any existing intermediate directory
-	boost::system::error_code ec;
-	boost::filesystem::path path(m_pImplData->m_intermediatePath);
-	if (boost::filesystem::is_directory(path))
-	{
-		// In theory remove_all should do the job here, but it doesn't seem to
-		boost::filesystem::directory_iterator dir_iter(path), dir_end;
-		int removed = 0, failed = 0;
-		for(;dir_iter != dir_end; ++dir_iter)
-		{
-			boost::filesystem::remove(*dir_iter, ec);
-			if (ec) failed++;
-			else removed++;
-		}
-		boost::filesystem::remove(path,ec);
-		//m_pLogger->LogInfo("Deleted folder \"%ls\" containing existing intermediate runtime files\n", m_pImplData->m_intermediatePath.c_str(), numRemoved);
-	}
-#endif
 }
 
 void Compiler::RunCompile( const std::vector<boost::filesystem::path>& filesToCompile,
 					 const std::vector<boost::filesystem::path>& includeDirList,
 					 const boost::filesystem::path& outputFile )
 {
-#if 0
 	m_pImplData->m_bCompileIsComplete = false;
 	//optimization and c runtime
 #ifdef _DEBUG
-	std::string flags = "/Od /Zi /FC /LDd ";
+	std::string flags = "-c -g -fpic -fno-weak";
 #else
-	std::string flags = "/O2 /LD /Zi";	//also need debug information in release
+	std::string flags = "-c -O3 -g -fpic -fno-weak";
 #endif
-	if( NULL == m_pImplData->m_CmdProcessInfo.hProcess )
+	if( NULL == m_pImplData->m_pFileHandle )
 	{
 		m_pImplData->InitialiseProcess();
 	}
-
-	// Check for intermediate directory, create it if required
-	// There are a lot more checks and robustness that could be added here
-	std::string intermediate = m_pImplData->m_intermediatePath;
-	if (!boost::filesystem::exists(intermediate))
-	{
-		boost::system::error_code ec;
-		boost::filesystem::create_directory(intermediate,ec);
-		m_pImplData->m_pLogger->LogInfo("Created intermediate folder \"%s\"\n",intermediate.c_str());
-	}
-
 
 	//create include path search string
 	std::string strIncludeFiles;
 	for( size_t i = 0; i < includeDirList.size(); ++i )
 	{
-		strIncludeFiles += " /I " + includeDirList[i].string();
+		strIncludeFiles += " -I " + includeDirList[i].string();
 	}
 
 
-	// When using multithreaded compilation, listing a file for compilation twice can cause errors, hence 
-	// we do a final filtering of input here.
-	// See http://msdn.microsoft.com/en-us/library/bb385193.aspx - "Source Files and Build Order"
-
 	// Create include path search string
 	std::string strFilesToCompile;
+	std::string strObjectFiles;
 	std::set<std::string> filteredPaths;
 	for( size_t i = 0; i < filesToCompile.size(); ++i )
 	{
 		std::string strPath = filesToCompile[i].string();
-#ifdef _WINDOWS_
-		// In Win32, make filename lowercase so paths can be compared. Could alternatively use boost equality() operation.
-		strPath = boost::to_lower_copy(strPath);
-#endif
 		std::set<std::string>::const_iterator it = filteredPaths.find(strPath);
 		if (it == filteredPaths.end())
 		{
 			strFilesToCompile += " " + strPath;
+
+			boost::filesystem::path path(strPath);
+			path = path.replace_extension(".o");
+			strObjectFiles += " ";
+			std::string s = path.filename().string();
+			strObjectFiles += s;
+
 			filteredPaths.insert(strPath);
 		}
 		else
@@ -321,21 +155,20 @@ void Compiler::RunCompile( const std::vector<boost::filesystem::path>& filesToCo
 		}
 	}
 
+	while(1)
+	{
+		const int pos = strObjectFiles.find(".cpp");
+		if (pos==-1) break;
+		strObjectFiles.replace(pos,4,".o");
+	}
 
+	std::string cmdToSend = "g++ " + flags + " -D PLATFORM_MAC ";
 
-char* pCharTypeFlags = "";
-#ifdef UNICODE
-	pCharTypeFlags = "/D UNICODE /D _UNICODE ";
-#endif
-
-	// /MP - use multiple processes to compile if possible. Only speeds up compile for multiple files and not link
-	std::string cmdToSend = "cl " + flags + pCharTypeFlags
-		+ " /MP /Fo\"" + intermediate + "\\\\\" "
-		+ "/D WIN32 /EHa /Fe" + outputFile.string();
-	cmdToSend += " " + strIncludeFiles + " " + strFilesToCompile + "\necho " + c_CompletionToken + "\n";
+	cmdToSend += " " + strIncludeFiles + " " + strFilesToCompile + " && g++ -dynamiclib -weak_reference_mismatches=weak -fvisibility=hidden -current_version 1.0 " + strObjectFiles + " -o \"" + outputFile.string() + "\"\necho " + c_CompletionToken + "\n";
     
-	WriteInput( m_pImplData->m_CmdProcessInputWrite, cmdToSend );
-#endif
+	WriteInput( m_pImplData->m_pFileHandle, cmdToSend );
+
+	m_pImplData->m_bCompileIsComplete = true;
 }
 
 
@@ -391,11 +224,35 @@ void ReadAndHandleOutputThread( void *arg )
 		}
      }
 }
-
-void WriteInput( HANDLE hPipeWrite, std::string& input  )
-{
-    DWORD nBytesWritten;
-	size_t length = input.length();
-	WriteFile( hPipeWrite, input.c_str() , length, &nBytesWritten, NULL );
-}
 #endif
+
+void WriteInput( FILE *writeHere, std::string& input  )
+{
+    int nBytesWritten;
+	size_t length = input.length();
+
+	printf("RUNNING COMMAND: %s\n", input.c_str());
+
+	fwrite(input.c_str(), length, 1, writeHere);
+	fflush(writeHere);
+
+	bool keepreading = true;
+
+	while (keepreading)
+	{
+		char data[4096] = {0};
+		int s = fscanf(writeHere, "%4095s", data);
+
+		printf("OUTPUT: %s\n", data);
+
+		if (s > 0)
+		{
+			if (strcmp(data, c_CompletionToken.c_str()) == 0)
+			{
+				keepreading = false;
+			}
+		}
+		else
+			keepreading = false;
+	}
+}
