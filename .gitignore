@@ -36,6 +36,7 @@
 
 # misc
 *.bak
+*.d
 
 # Intel VTune Amplifier XE Results
 My Amplifier XE Results - SimpleTest/
